@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { newDraftPayload, canonicalDraftDigest } from "../src/security.js";
 import { PostgresStateStore } from "../src/store/postgres.js";
 
@@ -16,7 +17,7 @@ test("PostgreSQL store preserves immutable drafts and permanent replay protectio
       instagramUserId: "123",
       expectedUsername: "andrewvoxai",
       mediaUrl: "https://example.com/postgres-store.jpg",
-      caption: `postgres-${crypto.randomUUID()}`,
+      caption: `postgres-${randomUUID()}`,
       ttlMinutes: 30,
     });
 
