@@ -9,7 +9,8 @@ Thanks for helping improve the bridge. Security, interoperability, and clarity a
 - Keep secrets out of code, tests, fixtures, logs, screenshots, issues, and pull requests.
 - Prefer least-privilege API scopes and explicit capability expansion.
 - Keep the configured Instagram identity pinned and fail closed on mismatch.
-- Add tests for authorization, replay, expiry, identity mismatch, and malformed input when changing security-sensitive code.
+- Preserve the `StateStore` invariants across every storage adapter.
+- Add tests for authorization, replay, expiry, identity mismatch, malformed input, and storage failure when changing security-sensitive code.
 
 ## Development
 
@@ -19,7 +20,9 @@ npm run typecheck
 npm test
 ```
 
-Node.js 20 or newer is required.
+Node.js 22 or newer is required.
+
+Changes to PostgreSQL schema or storage behavior must include a versioned migration and should be exercised against a disposable PostgreSQL instance before merge. The repository CI does this automatically.
 
 ## Pull requests
 
@@ -32,6 +35,8 @@ Keep changes focused. Explain:
 5. which tests cover the change.
 
 A capability that needs a broader Meta permission should be reviewed as a permission-surface change, not slipped into an unrelated refactor.
+
+A new storage adapter must not weaken immutable drafts, atomic claims, permanent post-publication replay blocking, or the human approval boundary.
 
 ## Security reports
 

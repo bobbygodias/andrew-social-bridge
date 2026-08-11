@@ -9,6 +9,7 @@ import {
   newDraftPayload,
 } from "./security.js";
 import { getStateStore, type StateStore } from "./store.js";
+import { APP_VERSION } from "./version.js";
 
 function toolError(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error";
@@ -20,7 +21,7 @@ function toolError(error: unknown) {
 
 export function buildMcpServer(stateStore: StateStore = getStateStore()): McpServer {
   const server = new McpServer(
-    { name: "andrew-social-bridge", version: "0.3.1" },
+    { name: "andrew-social-bridge", version: APP_VERSION },
     {
       instructions:
         "This bridge serves the configured Andrew Vox Instagram identity. Read actions are allowed. Preparing a draft never publishes. Final Instagram publication is intentionally unavailable as an MCP tool: only the separate human approval page can publish after external authentication and an explicit click. Never request, reveal, or return Instagram tokens, approval passwords, cookies, or 2FA codes.",

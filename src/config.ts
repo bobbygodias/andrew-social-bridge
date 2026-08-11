@@ -11,9 +11,20 @@ const ConfigSchema = z.object({
   APPROVAL_HMAC_SECRET: z.string().min(32),
   APPROVER_USERNAME: z.string().min(1),
   APPROVER_PASSWORD: z.string().min(16),
+  STATE_STORE_BACKEND: z.enum(["filesystem", "postgres"]).default("filesystem"),
   APPROVAL_STATE_DIR: z.string().min(1).default(".state"),
+  DATABASE_URL: z.string().regex(/^postgres(?:ql)?:\/\//).optional(),
+  DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).default(4),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+}).superRefine((config, ctx) => {
+  if (config.STATE_STORE_BACKEND === "postgres" && !config.DATABASE_URL) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["DATABASE_URL"],
+      message: "DATABASE_URL is required when STATE_STORE_BACKEND=postgres",
+    });
+  }
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema>;
