@@ -30,6 +30,21 @@ export class FileStateStore implements StateStore {
     return path.join(this.dirs().claims, `${digest}.claim`);
   }
 
+  private publishedPath(digest: string): string {
+    return this.claimPath(digest).replace(/\.claim$/, ".published.json");
+  }
+
+  private async assertNotPublished(digest: string): Promise<void> {
+    try {
+      await fs.access(this.publishedPath(digest));
+      throw new Error("This exact draft was already published; replay blocked");
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") return;
+      throw error;
+    }
+  }
+
   async saveDraft(payload: DraftPayload): Promise<void> {
     await this.ensureDirs();
     if (!isValidDraftId(payload.id)) throw new Error("Invalid draft id");
@@ -50,6 +65,7 @@ export class FileStateStore implements StateStore {
   async claimPublication(payload: DraftPayload): Promise<PublicationClaim> {
     await this.ensureDirs();
     const digest = canonicalDraftDigest(payload);
+    await this.assertNotPublished(digest);
     const claimPath = this.claimPath(digest);
     try {
       await fs.writeFile(claimPath, `${new Date().toISOString()}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
@@ -67,11 +83,18 @@ export class FileStateStore implements StateStore {
 
   async completePublicationClaim(digest: string, result: PublicationResult): Promise<void> {
     const claimPath = this.claimPath(digest);
-    const finalPath = claimPath.replace(/\.claim$/, ".published.json");
-    await fs.writeFile(finalPath, `${JSON.stringify({ ...result, publishedAt: new Date().toISOString() }, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
+    const finalPath = this.publishedPath(digest);
+    try {
+      await fs.writeFile(finalPath, `${JSON.stringify({ ...result, publishedAt: new Date().toISOString() }, null, 2)}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+        flag: "wx",
+      });
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "EEXIST") throw new Error("Publication receipt already exists; replay blocked");
+      throw error;
+    }
     await fs.rm(claimPath, { force: true });
   }
 }
