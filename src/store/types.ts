@@ -10,6 +10,7 @@ export type PublicationClaim = {
 };
 
 export interface StateStore {
+  assertReady(): Promise<void>;
   saveDraft(payload: DraftPayload): Promise<void>;
   loadDraft(id: string): Promise<DraftPayload>;
   claimPublication(payload: DraftPayload): Promise<PublicationClaim>;
