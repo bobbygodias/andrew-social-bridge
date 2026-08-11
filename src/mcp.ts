@@ -8,7 +8,7 @@ import {
   isPublicHttpsUrl,
   newDraftPayload,
 } from "./security.js";
-import { saveDraft } from "./store.js";
+import { getStateStore, type StateStore } from "./store.js";
 
 function toolError(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error";
@@ -18,7 +18,7 @@ function toolError(error: unknown) {
   };
 }
 
-export function buildMcpServer(): McpServer {
+export function buildMcpServer(stateStore: StateStore = getStateStore()): McpServer {
   const server = new McpServer(
     { name: "andrew-social-bridge", version: "0.3.1" },
     {
@@ -97,7 +97,7 @@ export function buildMcpServer(): McpServer {
           caption,
           ttlMinutes: approval_ttl_minutes,
         });
-        await saveDraft(payload);
+        await stateStore.saveDraft(payload);
         const digest = canonicalDraftDigest(payload);
         const signature = createApprovalSignature(payload);
         const base = config.PUBLIC_BASE_URL.replace(/\/$/, "");
