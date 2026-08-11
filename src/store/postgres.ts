@@ -83,8 +83,8 @@ export class PostgresStateStore implements StateStore {
       [id],
     );
 
-    if (result.rowCount !== 1) throw new Error("Draft not found");
     const row = result.rows[0];
+    if (result.rowCount !== 1 || !row) throw new Error("Draft not found");
     const payload = row.payload;
 
     if (!payload || payload.id !== id || payload.v !== 1 || payload.kind !== "image") {
