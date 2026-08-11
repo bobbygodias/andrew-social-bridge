@@ -45,6 +45,10 @@ export class FileStateStore implements StateStore {
     }
   }
 
+  async assertReady(): Promise<void> {
+    await this.ensureDirs();
+  }
+
   async saveDraft(payload: DraftPayload): Promise<void> {
     await this.ensureDirs();
     if (!isValidDraftId(payload.id)) throw new Error("Invalid draft id");
