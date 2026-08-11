@@ -11,14 +11,10 @@ import {
   verifyPublishActionToken,
 } from "./security.js";
 import { assertExpectedIdentity, publishImage } from "./instagram.js";
-import {
-  claimPublication,
-  completePublicationClaim,
-  loadDraft,
-  releasePublicationClaim,
-} from "./store.js";
+import { getStateStore } from "./store.js";
 
 const config = getConfig();
+const stateStore = getStateStore();
 const app = express();
 app.disable("x-powered-by");
 app.use(express.urlencoded({ extended: false, limit: "64kb" }));
@@ -29,7 +25,7 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 app.post("/mcp", async (req: Request, res: Response) => {
-  const server = buildMcpServer();
+  const server = buildMcpServer(stateStore);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -60,7 +56,7 @@ app.get("/approve", requireHumanApproval, async (req: Request, res: Response) =>
   const id = typeof req.query.id === "string" ? req.query.id : "";
   const sig = typeof req.query.sig === "string" ? req.query.sig : "";
   try {
-    const payload = await loadDraft(id);
+    const payload = await stateStore.loadDraft(id);
     verifyApprovalSignature(payload, sig);
     if (payload.instagramUserId !== config.INSTAGRAM_USER_ID) throw new Error("Draft targets a different Instagram account id");
     if (payload.expectedUsername.toLowerCase() !== config.INSTAGRAM_EXPECTED_USERNAME.toLowerCase()) {
@@ -104,9 +100,9 @@ app.post("/approve/publish", requireHumanApproval, async (req: Request, res: Res
   const id = typeof req.body?.id === "string" ? req.body.id : "";
   const sig = typeof req.body?.sig === "string" ? req.body.sig : "";
   const actionToken = typeof req.body?.action_token === "string" ? req.body.action_token : "";
-  let claimPath: string | undefined;
+  let claimedDigest: string | undefined;
   try {
-    const payload = await loadDraft(id);
+    const payload = await stateStore.loadDraft(id);
     verifyApprovalSignature(payload, sig);
     verifyPublishActionToken(payload, actionToken);
     if (payload.instagramUserId !== config.INSTAGRAM_USER_ID) throw new Error("Draft targets a different Instagram account id");
@@ -114,11 +110,11 @@ app.post("/approve/publish", requireHumanApproval, async (req: Request, res: Res
       throw new Error("Draft targets a different Instagram username");
     }
 
-    const claim = await claimPublication(payload);
-    claimPath = claim.claimPath;
+    const claim = await stateStore.claimPublication(payload);
+    claimedDigest = claim.digest;
     const result = await publishImage({ imageUrl: payload.mediaUrl, caption: payload.caption });
-    await completePublicationClaim(claim.claimPath, result);
-    claimPath = undefined;
+    await stateStore.completePublicationClaim(claim.digest, result);
+    claimedDigest = undefined;
 
     console.info("Instagram publication approved and completed", {
       draftDigest: claim.digest,
@@ -135,7 +131,7 @@ app.post("/approve/publish", requireHumanApproval, async (req: Request, res: Res
 <p>SHA-256 do rascunho aprovado: <code>${claim.digest}</code></p>
 <p>A credencial humana de aprovação nunca foi exposta ao MCP.</p></body></html>`);
   } catch (error) {
-    if (claimPath) await releasePublicationClaim(claimPath).catch(() => undefined);
+    if (claimedDigest) await stateStore.releasePublicationClaim(claimedDigest).catch(() => undefined);
     const message = error instanceof Error ? error.message : "Publication failed";
     console.error("Instagram publication failed", message);
     res.status(502).type("text").send(`Publication failed: ${message}`);
