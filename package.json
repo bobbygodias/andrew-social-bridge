@@ -1,11 +1,11 @@
 {
   "name": "andrew-social-bridge",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "A minimal, safety-gated MCP bridge between Andrew Vox in ChatGPT and the Instagram API.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -13,16 +13,19 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
+    "migrate": "node scripts/migrate.mjs",
     "verify:instagram": "node scripts/verify-instagram-identity.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
     "express": "^5.1.0",
+    "pg": "^8.22.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"
   },
