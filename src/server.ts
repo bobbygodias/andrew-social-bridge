@@ -12,6 +12,7 @@ import {
 } from "./security.js";
 import { assertExpectedIdentity, publishImage } from "./instagram.js";
 import { getStateStore } from "./store.js";
+import { APP_VERSION } from "./version.js";
 
 const config = getConfig();
 const stateStore = getStateStore();
@@ -21,7 +22,7 @@ app.use(express.urlencoded({ extended: false, limit: "64kb" }));
 app.use(express.json({ limit: "256kb" }));
 
 app.get("/health", (_req: Request, res: Response) => {
-  res.json({ ok: true, service: "andrew-social-bridge", version: "0.3.1" });
+  res.json({ ok: true, service: "andrew-social-bridge", version: APP_VERSION });
 });
 
 app.post("/mcp", async (req: Request, res: Response) => {
@@ -101,6 +102,7 @@ app.post("/approve/publish", requireHumanApproval, async (req: Request, res: Res
   const sig = typeof req.body?.sig === "string" ? req.body.sig : "";
   const actionToken = typeof req.body?.action_token === "string" ? req.body.action_token : "";
   let claimedDigest: string | undefined;
+
   try {
     const payload = await stateStore.loadDraft(id);
     verifyApprovalSignature(payload, sig);
@@ -112,7 +114,19 @@ app.post("/approve/publish", requireHumanApproval, async (req: Request, res: Res
 
     const claim = await stateStore.claimPublication(payload);
     claimedDigest = claim.digest;
-    const result = await publishImage({ imageUrl: payload.mediaUrl, caption: payload.caption });
+
+    let result: { containerId: string; mediaId: string };
+    try {
+      result = await publishImage({ imageUrl: payload.mediaUrl, caption: payload.caption });
+    } catch (error) {
+      await stateStore.releasePublicationClaim(claim.digest).catch(() => undefined);
+      claimedDigest = undefined;
+      throw error;
+    }
+
+    // From this point onward, an external publication has succeeded. If receipt
+    // persistence fails, keep the claim instead of releasing it: automatic release
+    // could allow a retry to duplicate an already-published Instagram post.
     await stateStore.completePublicationClaim(claim.digest, result);
     claimedDigest = undefined;
 
@@ -131,7 +145,11 @@ app.post("/approve/publish", requireHumanApproval, async (req: Request, res: Res
 <p>SHA-256 do rascunho aprovado: <code>${claim.digest}</code></p>
 <p>A credencial humana de aprovação nunca foi exposta ao MCP.</p></body></html>`);
   } catch (error) {
-    if (claimedDigest) await stateStore.releasePublicationClaim(claimedDigest).catch(() => undefined);
+    if (claimedDigest) {
+      console.error("Publication claim preserved for manual inspection after post-publication failure", {
+        draftDigest: claimedDigest,
+      });
+    }
     const message = error instanceof Error ? error.message : "Publication failed";
     console.error("Instagram publication failed", message);
     res.status(502).type("text").send(`Publication failed: ${message}`);
@@ -142,17 +160,20 @@ app.use((_req: Request, res: Response) => res.status(404).send("Not found"));
 
 async function start(): Promise<void> {
   try {
+    await stateStore.assertReady();
+    console.error(`State store ready: ${config.STATE_STORE_BACKEND}`);
+
     const profile = await assertExpectedIdentity();
     console.error(`Instagram identity verified at startup: @${profile.username ?? "unknown"} (${profile.id})`);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown identity verification error";
-    console.error(`Startup blocked: Instagram identity verification failed: ${message}`);
+    const message = error instanceof Error ? error.message : "unknown startup verification error";
+    console.error(`Startup blocked: ${message}`);
     process.exitCode = 1;
     return;
   }
 
   app.listen(config.PORT, "0.0.0.0", () => {
-    console.error(`Andrew Social Bridge listening on port ${config.PORT}`);
+    console.error(`Andrew Social Bridge ${APP_VERSION} listening on port ${config.PORT}`);
     console.error(`MCP endpoint: ${config.PUBLIC_BASE_URL.replace(/\/$/, "")}/mcp`);
   });
 }
