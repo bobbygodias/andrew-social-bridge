@@ -92,7 +92,7 @@ export function isPublicHttpsUrl(raw: string): boolean {
     if (url.username || url.password) return false;
 
     // WHATWG URL parsing normalizes alternative IPv4 spellings (e.g. 127.1).
-    const hostname = url.hostname.toLowerCase().replace(/\\.$/, "");
+    const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
     if (
       hostname === "localhost" ||
       hostname.endsWith(".localhost") ||
