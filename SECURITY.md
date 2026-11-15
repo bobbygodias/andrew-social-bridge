@@ -50,7 +50,7 @@ The token is stored server-side and only used by the bridge for fixed-account AP
 | Multi-instance race | Use `PostgresStateStore`; uniqueness/foreign-key constraints enforce claim identity at the database boundary. |
 | State backend unavailable or uninitialized | Startup calls `StateStore.assertReady()` and fails closed before opening the listener. |
 | Secret exposure in model output | Secrets are environment variables/secret-manager values only; MCP tools never return them. |
-| Public MCP abuse / draft-storage DoS | **Not solved in v0.4.0.** Keep MCP private behind a controlled/private connection until MCP OAuth 2.1 is implemented. |
+| Media URL using literal IPv4/IPv6, localhost variants, or embedded credentials | Preparation rejects numeric IP literals (including IPv4-mapped IPv6), localhost/local/internal hostnames, and userinfo. DNS resolution, redirects, and true public reachability are **not** guaranteed by this syntactic check. |\n| Public MCP abuse / draft-storage DoS | **Not solved in v0.4.0.** Keep MCP private behind a controlled/private connection until MCP OAuth 2.1 is implemented. |
 | Compromised deployment host | Out of scope for app-layer controls; use secret manager, minimal host permissions, patching, encrypted storage, and audit logs. |
 
 ## Known security gates before public exposure
