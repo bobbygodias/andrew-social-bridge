@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import net from "node:net";
 import type { Request, Response, NextFunction } from "express";
 import { getConfig } from "./config.js";
 
@@ -88,20 +89,29 @@ export function isPublicHttpsUrl(raw: string): boolean {
   try {
     const url = new URL(raw);
     if (url.protocol !== "https:") return false;
-    const host = url.hostname.toLowerCase();
-    if (host === "localhost" || host.endsWith(".local")) return false;
-    if (host === "::1" || host === "0.0.0.0") return false;
+    if (url.username || url.password) return false;
 
-    const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-    if (ipv4) {
-      const octets = ipv4.slice(1).map(Number);
-      if (octets.some((n) => n < 0 || n > 255)) return false;
-      const [a, b] = octets;
-      if (a === 10 || a === 127 || a === 0) return false;
-      if (a === 169 && b === 254) return false;
-      if (a === 172 && b !== undefined && b >= 16 && b <= 31) return false;
-      if (a === 192 && b === 168) return false;
-    }
+    // WHATWG URL parsing normalizes alternative IPv4 spellings (e.g. 127.1).
+    const hostname = url.hostname.toLowerCase().replace(/\\.$/, "");
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal")
+    ) return false;
+
+    // Node's URL.hostname includes [] around IPv6 literals. Exclude every
+    // numeric IP literal, including IPv4-mapped IPv6, rather than trying to
+    // maintain a fragile list of private ranges.
+    const ipCandidate = hostname.startsWith("[") && hostname.endsWith("]")
+      ? hostname.slice(1, -1)
+      : hostname;
+    if (net.isIP(ipCandidate) !== 0) return false;
+
+    // Single-label hosts are not suitable as public image origins.
+    if (!hostname.includes(".")) return false;
+
+    // This is syntactic filtering, not a DNS/public-reachability guarantee.
     return true;
   } catch {
     return false;
