@@ -31,12 +31,34 @@ test("draft approval signatures bind exact content", () => {
   assert.throws(() => sec.verifyApprovalSignature({ ...draft, caption: "changed" }, sig));
 });
 
-test("private and local image URLs are rejected", () => {
-  assert.equal(sec.isPublicHttpsUrl("http://example.com/a.jpg"), false);
-  assert.equal(sec.isPublicHttpsUrl("https://localhost/a.jpg"), false);
-  assert.equal(sec.isPublicHttpsUrl("https://127.0.0.1/a.jpg"), false);
-  assert.equal(sec.isPublicHttpsUrl("https://192.168.1.3/a.jpg"), false);
-  assert.equal(sec.isPublicHttpsUrl("https://example.com/a.jpg"), true);
+test("image URL policy rejects literal IPs, local hosts, and embedded credentials", () => {
+  const rejected = [
+    "http://example.com/a.jpg",
+    "https://localhost/a.jpg",
+    "https://localhost./a.jpg",
+    "https://test.localhost/a.jpg",
+    "https://printer.local/a.jpg",
+    "https://service.internal/a.jpg",
+    "https://127.0.0.1/a.jpg",
+    "https://127.1/a.jpg",
+    "https://192.168.1.3/a.jpg",
+    "https://8.8.8.8/a.jpg",
+    "https://[::1]/a.jpg",
+    "https://[fe80::1]/a.jpg",
+    "https://[fc00::1]/a.jpg",
+    "https://[::ffff:127.0.0.1]/a.jpg",
+    "https://user:secret@example.com/a.jpg",
+  ];
+  for (const url of rejected) {
+    assert.equal(sec.isPublicHttpsUrl(url), false, `accepted: ${url}`);
+  }
+
+  for (const url of [
+    "https://example.com/a.jpg",
+    "https://cdn.example.com:443/a.jpg",
+  ]) {
+    assert.equal(sec.isPublicHttpsUrl(url), true, `rejected: ${url}`);
+  }
 });
 
 test("filesystem store preserves immutable drafts and atomic replay claims", async () => {
