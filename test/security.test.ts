@@ -31,6 +31,23 @@ test("draft approval signatures bind exact content", () => {
   assert.throws(() => sec.verifyApprovalSignature({ ...draft, caption: "changed" }, sig));
 });
 
+test("approval and publication tokens fail closed on malformed or expired timestamps", () => {
+  const draft = sec.newDraftPayload({
+    instagramUserId: "123",
+    expectedUsername: "andrewvoxai",
+    mediaUrl: "https://example.com/image.jpg",
+    caption: "test",
+  });
+  for (const expiresAt of ["not-a-date", "", "2020-01-01T00:00:00.000Z"]) {
+    const changed = { ...draft, expiresAt };
+    // Even correctly signed malformed drafts must not bypass expiration.
+    const signature = sec.createApprovalSignature(changed);
+    const token = sec.createPublishActionToken(changed);
+    assert.throws(() => sec.verifyApprovalSignature(changed, signature), /expired or invalid/);
+    assert.throws(() => sec.verifyPublishActionToken(changed, token), /expired or invalid/);
+  }
+});
+
 test("private and local image URLs are rejected", () => {
   assert.equal(sec.isPublicHttpsUrl("http://example.com/a.jpg"), false);
   assert.equal(sec.isPublicHttpsUrl("https://localhost/a.jpg"), false);
