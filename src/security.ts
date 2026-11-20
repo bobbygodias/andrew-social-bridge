@@ -72,12 +72,14 @@ function safeEqual(a: string, b: string): boolean {
 
 export function verifyApprovalSignature(payload: DraftPayload, signature: string): void {
   if (!safeEqual(signature, createApprovalSignature(payload))) throw new Error("Invalid approval signature");
-  if (Date.parse(payload.expiresAt) <= Date.now()) throw new Error("Approval link expired");
+  const expiry = Date.parse(payload.expiresAt);
+  if (!Number.isFinite(expiry) || expiry <= Date.now()) throw new Error("Approval link expired or invalid");
 }
 
 export function verifyPublishActionToken(payload: DraftPayload, token: string): void {
   if (!safeEqual(token, createPublishActionToken(payload))) throw new Error("Invalid publish action token");
-  if (Date.parse(payload.expiresAt) <= Date.now()) throw new Error("Approval link expired");
+  const expiry = Date.parse(payload.expiresAt);
+  if (!Number.isFinite(expiry) || expiry <= Date.now()) throw new Error("Approval link expired or invalid");
 }
 
 export function isValidDraftId(value: string): boolean {
