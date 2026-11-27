@@ -56,3 +56,7 @@ Approval state is now host-agnostic behind `StateStore`, with both filesystem an
 7. Prepare one non-sensitive test draft and inspect its SHA-256 + approval page.
 8. Perform one deliberate human-approved publication test.
 9. Preserve the resulting publication receipt and review the complete audit path before expanding permissions.
+
+## 2026-11-27 — ambiguous publication recovery
+
+Preserve atomic claims on uncertain provider responses (including timeout or incomplete receipt) as well as local receipt failures. No automatic retry or claim release. Synthetic tests exercise four outcomes; manual reconciliation remains required. No changes to approval/authentication or live account.

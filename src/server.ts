@@ -13,6 +13,7 @@ import {
 import { assertExpectedIdentity, publishImage } from "./instagram.js";
 import { getStateStore } from "./store.js";
 import { APP_VERSION } from "./version.js";
+import { publishClaimedDraft } from "./publication.js";
 
 const config = getConfig();
 const stateStore = getStateStore();
@@ -115,19 +116,7 @@ app.post("/approve/publish", requireHumanApproval, async (req: Request, res: Res
     const claim = await stateStore.claimPublication(payload);
     claimedDigest = claim.digest;
 
-    let result: { containerId: string; mediaId: string };
-    try {
-      result = await publishImage({ imageUrl: payload.mediaUrl, caption: payload.caption });
-    } catch (error) {
-      await stateStore.releasePublicationClaim(claim.digest).catch(() => undefined);
-      claimedDigest = undefined;
-      throw error;
-    }
-
-    // From this point onward, an external publication has succeeded. If receipt
-    // persistence fails, keep the claim instead of releasing it: automatic release
-    // could allow a retry to duplicate an already-published Instagram post.
-    await stateStore.completePublicationClaim(claim.digest, result);
+    const result = await publishClaimedDraft(stateStore, payload, claim.digest, publishImage);
     claimedDigest = undefined;
 
     console.info("Instagram publication approved and completed", {
