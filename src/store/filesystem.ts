@@ -78,6 +78,10 @@ export class FileStateStore implements StateStore {
       if (code === "EEXIST") throw new Error("This exact draft was already claimed for publication; replay blocked");
       throw error;
     }
+    // Another claimant may have completed and removed its claim after our first
+    // receipt check, but before our exclusive write. Recheck while holding ours.
+    // Keep the claim on uncertain storage errors: publication must fail closed.
+    await this.assertNotPublished(digest);
     return { digest };
   }
 
