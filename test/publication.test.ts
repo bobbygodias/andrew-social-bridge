@@ -34,3 +34,36 @@ for (const scenario of ["timeout", "invalid-receipt", "receipt-write", "success"
     } finally { await fs.rm(dir, { recursive: true, force: true }); }
   });
 }
+
+test("claim blocks replay when another claimant completes between check and exclusive write", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "social-claim-race-"));
+  try {
+    const delayed = new FileStateStore(dir);
+    const winner = new FileStateStore(dir);
+    await delayed.assertReady();
+    const internal = delayed as unknown as { assertNotPublished(digest: string): Promise<void> };
+    const original = internal.assertNotPublished.bind(delayed);
+    let signalChecked!: () => void;
+    let resume!: () => void;
+    const checked = new Promise<void>(resolve => { signalChecked = resolve; });
+    const resumeGate = new Promise<void>(resolve => { resume = resolve; });
+    let first = true;
+    internal.assertNotPublished = async digest => {
+      await original(digest);
+      if (first) {
+        first = false;
+        signalChecked();
+        await resumeGate;
+      }
+    };
+    const attempt = delayed.claimPublication(payload);
+    const rejected = assert.rejects(attempt, /replay blocked/);
+    try {
+      await checked;
+      const claim = await winner.claimPublication(payload);
+      await winner.completePublicationClaim(claim.digest, { containerId: "c", mediaId: "m" });
+    } finally { resume(); }
+    await rejected;
+    await assert.rejects(() => winner.claimPublication(payload), /replay blocked/);
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});
